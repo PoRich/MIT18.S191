@@ -21,7 +21,6 @@ begin
 			Pkg.PackageSpec(name="PlutoUI", version="0.6.7-0.6"), 
 			Pkg.PackageSpec(name="Plots", version="1.6-1"),
 			])
-
 	using Plots
 	gr()
 	using PlutoUI
@@ -141,8 +140,7 @@ md"""
 
 # ╔═╡ d217a4b6-12e8-11eb-29ce-53ae143a39cd
 function finite_difference_slope(f::Function, a, h=1e-3)
-	
-	return missing
+	return (f(a+h) - f(a)) / h
 end
 
 # ╔═╡ f0576e48-1261-11eb-0579-0b1372565ca7
@@ -155,8 +153,12 @@ md"""
 
 # ╔═╡ cbf0a27a-12e8-11eb-379d-85550b942ceb
 function tangent_line(f, a, h)
-	
-	return missing
+	# return tangent line mx + b
+	m = finite_difference_slope(f, a, h)  # slope 
+	# point-slope formula for slope m and point (a, f(a))
+	# y - f(a) = m(x - a)
+	linefunction = x-> m*(x-a) + f(a)
+	return linefunction
 end
 
 # ╔═╡ 2b79b698-10b9-11eb-3bde-53fc1c48d5f7
@@ -219,8 +221,8 @@ Using this formula, we only need to know the _value_ ``f(a)`` and the _slope_ ``
 # ╔═╡ fa320028-12c4-11eb-0156-773e2aba8e58
 function euler_integrate_step(fprime::Function, fa::Number, 
 		a::Number, h::Number)
-	
-	return missing
+	#@debug "$(h)*fprime($(a)+ $(h)) + $(fa) => $(h*fprime(a+h) + fa)"
+	return h*fprime(a+h) + fa
 end
 
 # ╔═╡ 2335cae6-112f-11eb-3c2c-254e82014567
@@ -228,14 +230,44 @@ md"""
 👉 Write a function `euler_integrate` that takes takes a known function ``f'``, the initial value ``f(a)`` and a range `T` with `a == first(T)` and `h == step(T)`. It applies the function `euler_integrate_step` repeatedly, once per entry in `T`, to produce the sequence of values ``f(a+h)``, ``f(a+2h)``, etc.
 """
 
-# ╔═╡ fff7754c-12c4-11eb-2521-052af1946b66
+# ╔═╡ 173fc170-22d1-11eb-137b-1f9ac5c65684
 function euler_integrate(fprime::Function, fa::Number, 
 		T::AbstractRange)
-	
 	a0 = T[1]
 	h = step(T)
-	
-	return missing
+	# calculate first data point
+	payload = Float64[euler_integrate_step(fprime, fa, a0, h)]
+	# subsequent data points build on the previous one; 
+	for i in (a0+h):h:last(T)  # i iterates from 2nd element
+		# fa for next iteration is the integral from previous step
+		fa = euler_integrate_step(fprime, last(payload), i, h)
+		push!(payload, fa)
+	end
+	return payload
+end
+
+# ╔═╡ 1063006a-22c7-11eb-1543-91a20ac4279e
+# sandbox1
+let
+	f(x) = x^3
+	fprime(x) = 3x^2
+	a = 9.8 
+	h = 0.1
+	#f(9.9) # 970 # actual answer
+	0.1 * fprime(9.8) + f(9.8) # 970.004  # approximation by euler integrate step
+	# h * fprime(a) + f(a) # 970.004
+end
+
+# ╔═╡ 48c90448-22c9-11eb-00b2-ab3b18744337
+# sandbox2
+let
+	f(x) = x^3
+	fprime(x) = 3x^2
+	a = 9.9 
+	h = 0.1
+	f(10) # 1_000  # actual answer 
+	0.1 * fprime(9.9) + f(9.9) # 999.702  # approximation by euler integrate step
+	# h * fprime(a) + f(a) # 999.702
 end
 
 # ╔═╡ 4d0efa66-12c6-11eb-2027-53d34c68d5b0
@@ -254,7 +286,7 @@ euler_test = let
 end
 
 # ╔═╡ ab72fdbe-10be-11eb-3b33-eb4ab41730d6
-@bind N_euler Slider(2:40)
+@bind N_euler Slider(2:40, show_value=true)
 
 # ╔═╡ d21fad2a-1253-11eb-304a-2bacf9064d0d
 md"""
@@ -297,12 +329,11 @@ r(t+h) &= r(t) + h\,\cdot \gamma i(t)
 
 # ╔═╡ 1e5ca54e-12d8-11eb-18b8-39b909584c72
 function euler_SIR_step(β, γ, sir_0::Vector, h::Number)
-	s, i, r = sir_0
-	
+	s, i, r = sir_0  # initial values
 	return [
-		missing,
-		missing,
-		missing,
+		s - h * β*s*i,
+		i + h *(β*s*i-γ*i),
+		r + h * γ*i,
 	]
 end
 
@@ -322,14 +353,22 @@ You should return a vector of vectors: a 3-element vector for each point in time
 function euler_SIR(β, γ, sir_0::Vector, T::AbstractRange)
 	# T is a range, you get the step size and number of steps like so:
 	h = step(T)
-	
 	num_steps = length(T)
-	
-	return missing
+	# calculate first data point
+	payload = [euler_SIR_step(β, γ, sir_0, h)]
+	# subsequent data points build on the previous one; 
+	for i in (first(T)+h):h:last(T)  # i iterates from 2nd element
+		# initial values for next iteration is the integral from previous step
+		push!(payload, euler_SIR_step(β,γ, last(payload), h))
+	end
+	return payload
 end
 
 # ╔═╡ 4b791b76-12cd-11eb-1260-039c938f5443
 sir_T = 0 : 0.1 : 60.0
+
+# ╔═╡ 5a58ab02-235d-11eb-3652-eb2f6b461069
+length(sir_T)
 
 # ╔═╡ 0a095a94-1245-11eb-001a-b908128532aa
 sir_results = euler_SIR(0.3, 0.15, 
@@ -350,7 +389,7 @@ function plot_sir!(p, T, results; label="", kwargs...)
 	plot!(p, T, s; color=1, label=label*" S", lw=3, kwargs...)
 	plot!(p, T, i; color=2, label=label*" I", lw=3, kwargs...)
 	plot!(p, T, r; color=3, label=label*" R", lw=3, kwargs...)
-	
+	#plot!(p, size=(200, 150))
 	p
 end
 
@@ -364,7 +403,7 @@ md"""
 
 # ╔═╡ 589b2b4c-1245-11eb-1ec7-693c6bda97c4
 default_SIR_parameters_observation = md"""
-blabla
+No, infection appears relatively contained, spike in recoveries decreases the susceptible population
 """
 
 # ╔═╡ 58b45a0e-1245-11eb-04d1-23a1f3a0f242
@@ -373,7 +412,26 @@ md"""
 """
 
 # ╔═╡ 68274534-1103-11eb-0d62-f1acb57721bc
+begin
+	md"""β2"""
+	@bind β2 Slider((0.0001:0.0001: 0.5), default=0.3, show_value=true)
+end
 
+# ╔═╡ 060361ae-235e-11eb-002c-fb4950fe5791
+begin
+	md"""γ2"""
+	@bind γ2 Slider((0.0001:0.0001: 0.5), default=0.02, show_value=true)
+end
+
+# ╔═╡ 05c5eb4c-235e-11eb-0327-c3f50593efc1
+plot_sir!(plot(), sir_T, euler_SIR(β2, γ2, 
+	[0.99, 0.01, 0.00], 
+	sir_T))
+
+# ╔═╡ c7d80028-235e-11eb-098d-5750df353795
+md"""
+>It seems γ needs to be < 10% of β for an epidemic to result
+"""
 
 # ╔═╡ 82539bbe-106e-11eb-0e9e-170dfa6a7dad
 md"""
@@ -396,8 +454,9 @@ You should use **anonymous functions** for this. These have the form `x -> x^2`,
 
 # ╔═╡ bd8522c6-12e8-11eb-306c-c764f78486ef
 function ∂x(f::Function, a, b)
-	
-	return missing
+	#function g(a) return f(a,b) end
+	g = a -> f(a, b) 
+	return finite_difference_slope(g, a)
 end
 
 # ╔═╡ 321964ac-126d-11eb-0a04-0d3e3fb9b17c
@@ -408,8 +467,8 @@ end
 
 # ╔═╡ b7d3aa8c-12e8-11eb-3430-ff5d7df6a122
 function ∂y(f::Function, a, b)
-	
-	return missing
+	g = b -> f(a, b) # function g(a) return f(a,b) end
+	return finite_difference_slope(g, b)
 end
 
 # ╔═╡ a15509ee-126c-11eb-1fa3-cdda55a47fcb
@@ -427,7 +486,7 @@ md"""
 # ╔═╡ adbf65fe-12e8-11eb-04e9-3d763ba91a63
 function gradient(f::Function, a, b)
 	
-	return missing
+	return [∂x(f,a,b), ∂y(f,a,b)]
 end
 
 # ╔═╡ 66b8e15e-126c-11eb-095e-39c2f6abc81d
@@ -454,8 +513,7 @@ We want to minimize a 1D function, i.e. a function $f: \mathbb{R} \to \mathbb{R}
 
 # ╔═╡ a7f1829c-12e8-11eb-15a1-5de40ed92587
 function gradient_descent_1d_step(f, x0; η=0.01)
-	
-	return missing
+	return x0-η*finite_difference_slope(f, x0)
 end
 
 # ╔═╡ d33271a2-12df-11eb-172a-bd5600265f49
@@ -470,7 +528,28 @@ end
 @bind N_gradient_1d Slider(0:20)
 
 # ╔═╡ a53cf3f8-12e1-11eb-0b0c-2b794a7ac841
-md" ``x_0 = `` $(@bind x0_gradient_1d Slider(-3:.01:1.5, default=-1, show_value=true))"
+md" ``x_0 = `` $(@bind x0_gradient_1d Slider(-3.01:.01:1.5, default=-1, show_value=true))"
+
+# ╔═╡ 7895afc8-238c-11eb-0405-37cc5cb87a66
+let # sandbox 2
+	x0 = x0_gradient_1d  # initial x value
+	f = x -> x^4 + 3x^3 - 3x + 5.  # function
+	f′ = x -> 4x^3+9x^2 - 3  # derivative (for checking)
+
+	
+	history = accumulate(1:N_gradient_1d, init=x0) do old, _
+		gradient_descent_1d_step(f, old, η=.025)
+	end
+	
+	history2 = [x0]
+	for i in 1:N_gradient_1d
+		push!(history2, last(history2) + gradient_descent_1d_step(f, last(history2), η=0.025))
+	end
+	history2
+	#finite_difference_slope(f, x0) # estimated derivative @ x0=-1.03 is 2.17
+	#f′(x0) # derivative @ x0=-1.03 is 2.17
+
+end
 
 # ╔═╡ 754e4c48-12df-11eb-3818-f54f6fc7176b
 md"""
@@ -479,8 +558,10 @@ md"""
 
 # ╔═╡ 9489009a-12e8-11eb-2fb7-97ba0bdf339c
 function gradient_descent_1d(f, x0; η=0.01, N_steps=1000)
-	
-	return missing
+	for i in 1:N_steps
+		x0 = gradient_descent_1d_step(f, x0)	
+	end
+	return x0
 end
 
 # ╔═╡ 34dc4b02-1248-11eb-26b2-5d2610cfeb41
@@ -497,7 +578,7 @@ Right now we take a fixed number of steps, even if the minimum is found quickly.
 
 # ╔═╡ ebca11d8-12c9-11eb-3dde-c546eccf40fc
 better_stopping_idea = md"""
-blabla
+>Stop when the derivative is zero and second derivative around that point is positive, which is a global minimium 
 """
 
 # ╔═╡ 9fd2956a-1248-11eb-266d-f558cda55702
@@ -510,30 +591,61 @@ Multivariable calculus tells us that the gradient $\nabla f(a, b)$ at a point $(
 
 # ╔═╡ 852be3c4-12e8-11eb-1bbb-5fbc0da74567
 function gradient_descent_2d_step(f, x0, y0; η=0.01)
-	
-	return missing
+	return [x0, y0].- η.*gradient(f, x0, y0)  
 end
 
 # ╔═╡ 8a114ca8-12e8-11eb-2de6-9149d1d3bc3d
-function gradient_descent_2d(f, x0, y0; η=0.01)
-	
-	return missing
+function gradient_descent_2d(f, x0, y0; η=0.01, max_iter = 100_000)
+	# max_iter = maximum iterations to prevent inifinite loops in case there is no minima 
+	ϵ = 1e-6  # stop iteration when gradient is below this threshold;
+	counter = 1
+	tune_x = abs(∂x(f, x0, y0)) > ϵ
+	tune_y = abs(∂y(f, x0, y0)) > ϵ
+	# TODO - check that learning η is not too big, which would cause the loss function to return NAN
+	while (tune_x||tune_y) & (counter <= max_iter)
+		@debug "$(counter) iter on $(f): ∂x $(abs(∂x(f, x0, y0))), ∂y $(abs(∂y(f, x0, y0)))=>x:$(x0), y:$(y0)"
+		counter += 1 
+		x_next, y_next = gradient_descent_2d_step(f, x0, y0;η=η)
+		#update x and y if derivative is above threshold
+		if tune_x; x0 = x_next end
+		if tune_y; y0 = y_next end
+		tune_x = abs(∂x(f, x0, y0)) > ϵ
+		tune_y = abs(∂y(f, x0, y0)) > ϵ
+	end
+	return (x0, y0)
 end
+
+# ╔═╡ 1dc18ac8-238b-11eb-2164-2f358d1c1b06
+md""" >f(3.58, -1.85) appears to be another minimum, evaluating to 1.53"""
 
 # ╔═╡ 4454c2b2-12e3-11eb-012c-c362c4676bf6
 @bind N_gradient_2d Slider(0:20)
 
 # ╔═╡ 4aace1a8-12e3-11eb-3e07-b5827a2a6765
-md" ``x_0 = `` $(@bind x0_gradient_2d Slider(-4:.01:4, default=0, show_value=true))"
+md" ``x_0 = `` $(@bind x0_gradient_2d Slider(-4:.01:4, default=0.5, show_value=true))"
 
 # ╔═╡ 54a58f84-12e3-11eb-10b9-7d55a16c81ba
 md" ``y_0 = `` $(@bind y0_gradient_2d Slider(-4:.01:4, default=0, show_value=true))"
 
 # ╔═╡ a0045046-1248-11eb-13bd-8b8ad861b29a
-himmelbau(x, y) = (x^2 + y - 11)^2 + (x + y^2 - 7)^2
+begin
+	himmelbau(x, y) = (x^2 + y - 11)^2 + (x + y^2 - 7)^2
+	himmelbau_xprime(x, y) = 4*x^3 + 4*x*y - 42*x + 2*y^2 - 14
+	himmelbau_yprime(x, y) = 4*y^3 + 4*x*y - 26*y + 2*x^2 - 22
+end
 
-# ╔═╡ 92854562-1249-11eb-0b81-156982df1284
-gradient_descent_2d(himmelbau, 0, 0)
+# ╔═╡ 7c546cf0-2382-11eb-29c8-8dfeba989661
+begin
+	pt1, pt2, pt3 = (0.5, -3.), (0.25, -3.), (0.5, -2.75)   # test points
+	pts = [pt1, pt2, pt3]
+	[gradient_descent_2d(himmelbau, pt...) for pt in pts]
+end
+
+# ╔═╡ b094f960-237d-11eb-2bd4-cf5fcaa966b9
+gradient(himmelbau, pt1...)  #approx derivative
+
+# ╔═╡ 0ff9fe90-236b-11eb-354e-796801121a29
+himmelbau_xprime(pt1...), himmelbau_yprime(pt1...)  # actual derivative
 
 # ╔═╡ 7e318fea-12e7-11eb-3490-b17e0d4dbc50
 md"""
@@ -541,7 +653,7 @@ We also prepared a 3D visualisation if you like! It's a bit slow...
 """
 
 # ╔═╡ 605aafa4-12e7-11eb-2d13-7f7db3fac439
-run_3d_visualisation = false
+run_3d_visualisation = true
 
 # ╔═╡ a03890d6-1248-11eb-37ee-85b0a5273e0c
 md"""
@@ -549,7 +661,14 @@ md"""
 """
 
 # ╔═╡ 6d1ee93e-1103-11eb-140f-63fca63f8b06
+let
+	pt1, pt2, pt3 = (-4, 4), (-4.5, 3.5), (-3.5, 4.5)   # test points
+	pts = [pt1, pt2, pt3]
+	[gradient_descent_2d(himmelbau, pt...) for pt in pts]
+end
 
+# ╔═╡ f75fd204-238a-11eb-3583-f5e90240cf89
+md""" >f(-2.80, 3.13) appears to be another minimum, evaluating to 1.785"""
 
 # ╔═╡ 8261eb92-106e-11eb-2ccc-1348f232f5c3
 md"""
@@ -587,7 +706,7 @@ function dice_frequencies(N_dice, N_experiments)
 end
 
 # ╔═╡ dbe9635a-124b-11eb-111d-fb611954db56
-dice_x, dice_y = dice_frequencies(10, 20_000)
+dice_x, dice_y = dice_frequencies(10, 20_000)  # 10 dice thrown 20K times
 
 # ╔═╡ 57090426-124e-11eb-0a17-1566ae96b7c2
 md"""
@@ -599,10 +718,10 @@ $$f_{\mu, \sigma}(x) := \frac{1}{\sigma \sqrt{2 \pi}}\exp \left[- \frac{(x - \mu
 """
 
 # ╔═╡ 66192a74-124c-11eb-0c6a-d74aecb4c624
-md"μ = $(@bind guess_μ Slider(1:0.1:last(dice_x); default = last(dice_x) * 0.4, show_value=true))"
+md"μ = $(@bind guess_μ Slider(1:0.1:last(dice_x); default = 35.3, show_value=true))"
 
 # ╔═╡ 70f0fe9c-124c-11eb-3dc6-e102e68673d9
-md"σ = $(@bind guess_σ Slider(0.1:0.1:last(dice_x)/2; default=12, show_value=true))"
+md"σ = $(@bind guess_σ Slider(0.1:0.1:last(dice_x)/2; default=5.7, show_value=true))"
 
 
 # ╔═╡ 41b2262a-124e-11eb-2634-4385e2f3c6b6
@@ -612,6 +731,9 @@ md"Show manual fit: $(@bind show_manual_fit CheckBox())"
 function gauss(x, μ, σ)
 	(1 / (sqrt(2π) * σ)) * exp(-(x-μ)^2 / σ^2 / 2)
 end
+
+# ╔═╡ cb69bd8e-239b-11eb-14d7-95b60406c3b7
+first(dice_x)  #51 length  10:60
 
 # ╔═╡ 471cbd84-124c-11eb-356e-371d23011af5
 md"""
@@ -624,8 +746,13 @@ $$\mathcal{L}(\mu, \sigma) := \sum_i [f_{\mu, \sigma}(x_i) - y_i]^2$$
 
 # ╔═╡ 2fc55daa-124f-11eb-399e-659e59148ef5
 function loss_dice(μ, σ)
-	
-	return missing
+	return sum([(gauss(dice_x[i], μ, σ) - dice_y[i])^2 for i in 1:length(dice_x)])
+end
+
+# ╔═╡ 9be96edc-239c-11eb-333b-8b9fe9a90f4c
+let  # test loss_dice
+	μ, σ = 35.2, 5.5
+	sum((gauss(dice_x[1], μ, σ) - dice_y[1])^2)
 end
 
 # ╔═╡ 3a6ec2e4-124f-11eb-0f68-791475bab5cd
@@ -639,10 +766,8 @@ md"""
 
 # ╔═╡ a150fd60-124f-11eb-35d6-85104bcfd0fe
 found_μ, found_σ = let
-	
-	# your code here
-	
-	missing, missing
+	init_μ, init_σ = 30, 1
+	gradient_descent_2d(loss_dice, init_μ, init_σ; η=0.05, max_iter=100000)
 end
 
 # ╔═╡ ac320522-124b-11eb-1552-51c2adaf2521
@@ -710,10 +835,10 @@ md"""
 """
 
 # ╔═╡ 4837e1ae-12d2-11eb-0df9-21dcc1892fc9
-md"β = $(@bind guess_β Slider(0.00:0.0001:0.1; default = 0.05, show_value=true))"
+md"β = $(@bind guess_β Slider(0.00:0.000001:0.1; default = 0.01828, show_value=true))"
 
 # ╔═╡ a9630d28-12d2-11eb-196b-773d8498b0bb
-md"γ = $(@bind guess_γ Slider(0.00:0.0001:0.01; default = 0.005, show_value=true))"
+md"γ = $(@bind guess_γ Slider(0.00:0.000001:0.01; default = 0.002145, show_value=true))"
 
 # ╔═╡ 23c53be4-12d4-11eb-1d39-8d11b4431993
 md"Show manual fit: $(@bind show_manual_sir_fit CheckBox())"
@@ -727,14 +852,26 @@ This time, instead of comparing two vectors of numbers, we need to compare two v
 
 """
 
+# ╔═╡ c6718eb8-23b9-11eb-145b-35f22bb89c7a
+let  # loss_sir test
+	β, γ = guess_β, guess_γ
+	x0 = [.99, 0.01, 0.00]
+	est_SIR = euler_SIR(β, γ, x0, hw4_T)  # array of vectors, one for each time period
+	sum([sum((est_SIR[t] - hw4_results[t]).^2) for t in hw4_T])
+end
+
 # ╔═╡ 754b5368-12e8-11eb-0763-e3ec56562c5f
 function loss_sir(β, γ)
-	
-	return missing
+	x0 = [.99, 0.01, 0.00]
+	est_SIR = euler_SIR(β, γ, x0, hw4_T)  # array of vectors, one for each time period
+	return sum([sum((est_SIR[t] - hw4_results[t]).^2) for t in hw4_T])
 end
 
 # ╔═╡ ee20199a-12d4-11eb-1c2c-3f571bbb232e
 loss_sir(guess_β, guess_γ)
+
+# ╔═╡ 0dd30d1c-23c2-11eb-1b08-77023512e6c6
+gradient(loss_sir, guess_β, guess_γ)
 
 # ╔═╡ 38b09bd8-12d5-11eb-2f7b-579e9db3973d
 md"""
@@ -743,10 +880,8 @@ md"""
 
 # ╔═╡ 6e1b5b6a-12e8-11eb-3655-fb10c4566cdc
 found_β, found_γ = let
-	
-	# your code here
-	
-	missing, missing
+	init_β, init_γ = 0.01828, 0.002145
+	gradient_descent_2d(loss_sir, init_β, init_γ; η=1e-8, max_iter=10000)
 end
 
 # ╔═╡ b94b7610-106d-11eb-2852-25337ce6ec3a
@@ -1128,9 +1263,10 @@ end |> as_svg
 # ╔═╡ 90114f98-12e0-11eb-2011-a3207bbc24f6
 function gradient_1d_viz(N_gradient_1d, x0)
 	f = x -> x^4 + 3x^3 - 3x + 5.
+	 
+	x = LinRange(-3, 1.5, 200)  # linear range from -3 to 1.5 with 200 steps
 	
-	x = LinRange(-3, 1.5, 200)
-	
+	# accumulates gradient descent values (N_gradient_1d times) starting with x0, with old being the input to the next value
 	history = accumulate(1:N_gradient_1d, init=x0) do old, _
 		gradient_descent_1d_step(f, old, η=.025)
 	end
@@ -1155,25 +1291,30 @@ end
 gradient_1d_viz(N_gradient_1d, x0_gradient_1d)
 
 # ╔═╡ 5e0f16b4-12e3-11eb-212f-e565f97adfed
-function gradient_2d_viz_3d(N_gradient_2d, x0, y0)
+begin
+	#using PlotlyBase
+	
+	function gradient_2d_viz_3d(N_gradient_2d, x0, y0)
 
-	history = accumulate(1:N_gradient_2d, init=[x0, y0]) do old, _
-		gradient_descent_2d_step(himmelbau, old...)
+
+		history = accumulate(1:N_gradient_2d, init=[x0, y0]) do old, _
+			gradient_descent_2d_step(himmelbau, old...)
+		end
+
+		all = [[x0, y0], history...]
+
+		p = surface(-4:0.4:5, -4:0.4:4, himmelbau)
+
+		trace = [himmelbau(s...) for s in all]
+
+		plot!(p, first.(all), last.(all), trace, 
+			color="blue", opacity=range(.5,step=.2,length=length(all)), label=nothing)
+		scatter!(p, first.(all), last.(all), trace, 
+			color="blue", label="gradient descent", 
+			markersize=3, markerstrokewidth=0)
+
+		as_svg(p)
 	end
-	
-	all = [[x0, y0], history...]
-	
-	p = surface(-4:0.4:5, -4:0.4:4, himmelbau)
-	
-	trace = [himmelbau(s...) for s in all]
-	
-	plot!(p, first.(all), last.(all), trace, 
-		color="blue", opacity=range(.5,step=.2,length=length(all)), label=nothing)
-	scatter!(p, first.(all), last.(all), trace, 
-		color="blue", label="gradient descent", 
-		markersize=3, markerstrokewidth=0)
-	
-	as_svg(p)
 end
 
 # ╔═╡ 9ae4ebac-12e3-11eb-0acc-23113f5264a9
@@ -1185,7 +1326,7 @@ if run_3d_visualisation
 		# we dont use the sliders because this plot is quite slow
 		x0 = 0.5
 		N = 20
-		y0 = -3
+		y0 = 0
 
 		p = gradient_2d_viz_3d(N, x0, y0)
 		gr()
@@ -1277,11 +1418,13 @@ end
 # ╠═fa320028-12c4-11eb-0156-773e2aba8e58
 # ╟─3df7d63a-12c4-11eb-11ca-0b8db4bd9121
 # ╟─2335cae6-112f-11eb-3c2c-254e82014567
-# ╠═fff7754c-12c4-11eb-2521-052af1946b66
+# ╠═173fc170-22d1-11eb-137b-1f9ac5c65684
+# ╠═1063006a-22c7-11eb-1543-91a20ac4279e
+# ╠═48c90448-22c9-11eb-00b2-ab3b18744337
 # ╟─4d0efa66-12c6-11eb-2027-53d34c68d5b0
 # ╠═b74d94b8-10bf-11eb-38c1-9f39dfcb1096
 # ╟─15b50428-1264-11eb-163e-23e2f3590502
-# ╟─ab72fdbe-10be-11eb-3b33-eb4ab41730d6
+# ╠═ab72fdbe-10be-11eb-3b33-eb4ab41730d6
 # ╟─990236e0-10be-11eb-333a-d3080a224d34
 # ╟─d21fad2a-1253-11eb-304a-2bacf9064d0d
 # ╟─518fb3aa-106e-11eb-0fcd-31091a8f12db
@@ -1290,14 +1433,18 @@ end
 # ╟─517efa24-1244-11eb-1f81-b7f95b87ce3b
 # ╠═51a0138a-1244-11eb-239f-a7413e2e44e4
 # ╠═4b791b76-12cd-11eb-1260-039c938f5443
+# ╠═5a58ab02-235d-11eb-3652-eb2f6b461069
 # ╠═0a095a94-1245-11eb-001a-b908128532aa
 # ╟─51c9a25e-1244-11eb-014f-0bcce2273cee
-# ╟─58675b3c-1245-11eb-3548-c9cb8a6b3188
-# ╟─b4bb4b3a-12ce-11eb-3fe5-ad7ccd73febb
+# ╠═58675b3c-1245-11eb-3548-c9cb8a6b3188
+# ╠═b4bb4b3a-12ce-11eb-3fe5-ad7ccd73febb
 # ╟─586d0352-1245-11eb-2504-05d0aa2352c6
-# ╠═589b2b4c-1245-11eb-1ec7-693c6bda97c4
+# ╟─589b2b4c-1245-11eb-1ec7-693c6bda97c4
 # ╟─58b45a0e-1245-11eb-04d1-23a1f3a0f242
 # ╠═68274534-1103-11eb-0d62-f1acb57721bc
+# ╠═060361ae-235e-11eb-002c-fb4950fe5791
+# ╠═05c5eb4c-235e-11eb-0327-c3f50593efc1
+# ╠═c7d80028-235e-11eb-098d-5750df353795
 # ╟─82539bbe-106e-11eb-0e9e-170dfa6a7dad
 # ╟─b394b44e-1245-11eb-2f86-8d10113e8cfc
 # ╠═bd8522c6-12e8-11eb-306c-c764f78486ef
@@ -1314,8 +1461,9 @@ end
 # ╠═a7f1829c-12e8-11eb-15a1-5de40ed92587
 # ╠═d33271a2-12df-11eb-172a-bd5600265f49
 # ╟─ed344a8c-12df-11eb-03a3-2922620fd20f
-# ╟─8ae98c74-12e0-11eb-2802-d9a544d8b7ae
-# ╟─88b30f10-12e1-11eb-383d-4f095625cd16
+# ╠═8ae98c74-12e0-11eb-2802-d9a544d8b7ae
+# ╠═88b30f10-12e1-11eb-383d-4f095625cd16
+# ╟─7895afc8-238c-11eb-0405-37cc5cb87a66
 # ╟─a53cf3f8-12e1-11eb-0b0c-2b794a7ac841
 # ╟─90114f98-12e0-11eb-2011-a3207bbc24f6
 # ╟─754e4c48-12df-11eb-3818-f54f6fc7176b
@@ -1327,9 +1475,12 @@ end
 # ╟─9fd2956a-1248-11eb-266d-f558cda55702
 # ╠═852be3c4-12e8-11eb-1bbb-5fbc0da74567
 # ╠═8a114ca8-12e8-11eb-2de6-9149d1d3bc3d
-# ╠═92854562-1249-11eb-0b81-156982df1284
+# ╠═b094f960-237d-11eb-2bd4-cf5fcaa966b9
+# ╠═0ff9fe90-236b-11eb-354e-796801121a29
+# ╠═7c546cf0-2382-11eb-29c8-8dfeba989661
+# ╠═1dc18ac8-238b-11eb-2164-2f358d1c1b06
 # ╠═4454c2b2-12e3-11eb-012c-c362c4676bf6
-# ╟─fbb4a9a4-1248-11eb-00e2-fd346f0056db
+# ╠═fbb4a9a4-1248-11eb-00e2-fd346f0056db
 # ╟─4aace1a8-12e3-11eb-3e07-b5827a2a6765
 # ╟─54a58f84-12e3-11eb-10b9-7d55a16c81ba
 # ╠═a0045046-1248-11eb-13bd-8b8ad861b29a
@@ -1340,18 +1491,21 @@ end
 # ╟─b6ae4d7e-12e6-11eb-1f92-c95c040d4401
 # ╟─a03890d6-1248-11eb-37ee-85b0a5273e0c
 # ╠═6d1ee93e-1103-11eb-140f-63fca63f8b06
+# ╠═f75fd204-238a-11eb-3583-f5e90240cf89
 # ╟─8261eb92-106e-11eb-2ccc-1348f232f5c3
 # ╠═65e691e4-124a-11eb-38b1-b1732403aa3d
 # ╟─6f4aa432-1103-11eb-13da-fdd9eefc7c86
 # ╠═dbe9635a-124b-11eb-111d-fb611954db56
-# ╟─ac320522-124b-11eb-1552-51c2adaf2521
+# ╠═ac320522-124b-11eb-1552-51c2adaf2521
 # ╟─57090426-124e-11eb-0a17-1566ae96b7c2
 # ╟─66192a74-124c-11eb-0c6a-d74aecb4c624
 # ╟─70f0fe9c-124c-11eb-3dc6-e102e68673d9
 # ╟─41b2262a-124e-11eb-2634-4385e2f3c6b6
 # ╠═0dea1f70-124c-11eb-1593-e535ab21976c
+# ╠═cb69bd8e-239b-11eb-14d7-95b60406c3b7
 # ╟─471cbd84-124c-11eb-356e-371d23011af5
 # ╠═2fc55daa-124f-11eb-399e-659e59148ef5
+# ╠═9be96edc-239c-11eb-333b-8b9fe9a90f4c
 # ╠═3a6ec2e4-124f-11eb-0f68-791475bab5cd
 # ╟─2fcb93aa-124f-11eb-10de-55fced6f4b83
 # ╠═a150fd60-124f-11eb-35d6-85104bcfd0fe
@@ -1371,8 +1525,10 @@ end
 # ╟─a9630d28-12d2-11eb-196b-773d8498b0bb
 # ╟─23c53be4-12d4-11eb-1d39-8d11b4431993
 # ╟─6016fccc-12d4-11eb-0f58-b9cd331cc7b3
+# ╠═c6718eb8-23b9-11eb-145b-35f22bb89c7a
 # ╠═754b5368-12e8-11eb-0763-e3ec56562c5f
 # ╠═ee20199a-12d4-11eb-1c2c-3f571bbb232e
+# ╠═0dd30d1c-23c2-11eb-1b08-77023512e6c6
 # ╟─38b09bd8-12d5-11eb-2f7b-579e9db3973d
 # ╠═6e1b5b6a-12e8-11eb-3655-fb10c4566cdc
 # ╟─106670f2-12d6-11eb-1854-5bf0fc6f4dfb
