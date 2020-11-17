@@ -17,5 +17,6 @@ https://computationalthinking.mit.edu/Fall20/
 * <a href="https://htmlpreview.github.io/?https://github.com/PoRich/MIT18.S191/blob/main/hw/hw6.jl.html">HW6</a>
 * <a href="https://htmlpreview.github.io/?https://github.com/PoRich/MIT18.S191/blob/main/hw/hw7.jl.html">HW7</a>
 * <a href="https://htmlpreview.github.io/?https://github.com/PoRich/MIT18.S191/blob/main/hw/hw8.jl.html">HW8</a>
+* <a href="https://htmlpreview.github.io/?https://github.com/PoRich/MIT18.S191/blob/main/hw/hw9.jl.html">HW9</a>
 * ...
 
